@@ -10,43 +10,34 @@
 #                                                                              #
 # **************************************************************************** #
 
-# apt-get update
-# apt-get upgrade -y
-# apt-get install nginx -y
-# apt-get install mariadb-server
-# apt-get install php-mbstring php-zip php-gd php-xml php-pear php-gettext php-cli php-cgi
-# apt-get install -y php-mysql php-fpm
-# apt-get install -y libnss3-tools
-# apt-get install -y wget
-# apt-get clean
-
-# rm /etc/nginx/sites-available/default
-# rm /etc/nginx/sites-enabled/default
-
-service mysql start
-echo "CREATE DATABASE wordpress;" | mysql -u root --skip-password
-echo "GRANT ALL PRIVILEGES ON wordpress.* TO 'root'@'localhost' WITH GRANT OPTION;" | mysql -u root --skip-password
-echo "update mysql.user set plugin='mysql_native_password' where user='root';" | mysql -u root --skip-password
-echo "FLUSH PRIVILEGES;" | mysql -u root --skip-password
-
-mkdir /var/www/localhost
-
-mv ./tmp/nginx-on.conf /etc/nginx/sites-available/default
-cp /tmp/nginx-off.conf /etc/nginx/sites-available/
-ln -s /etc/nginx/sites-available/nginx-on.conf /etc/nginx/sites-enabled/
+# setup nginx
+# mkdir /var/www/localhost
+ln -s /etc/nginx/sites-available/nginx.conf /etc/nginx/sites-enabled/
 rm -rf /etc/nginx/sites-enabled/default
+rm -rf /etc/nginx/sites-available/default
 
-cd /tmp/
+# setup wordpress
 wget -c https://wordpress.org/latest.tar.gz
-tar -xvzf latest.tar.gz
-mv wordpress/ /var/www/localhost
-mv /tmp/wp-config.php /var/www/localhost/wordpress/wp-config-sample.php
+mkdir /var/www/html/wordpress
+tar -xvzf latest.tar.gz --strip-components=1 -C /var/www/html/wordpress
+mv /tmp/wp-config.php /var/www/html/wordpress
+ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
 
-mkdir /var/www/localhost/phpmyadmin
+# setup my sql
+service mysql start
+echo "CREATE DATABASE wordpress;" | mysql -u root
+echo "CREATE USER 'admin'@'localhost' IDENTIFIED BY 'password';" | mysql -u root
+echo "SET PASSWORD FOR root@localhost=PASSWORD('password');" | mysql -u root
+echo "GRANT ALL PRIVILEGES ON wordpress.* TO 'admin'@'localhost';" | mysql -u root
+echo "FLUSH PRIVILEGES;" | mysql -u root
+
+# setup phpmyadmin
 wget https://files.phpmyadmin.net/phpMyAdmin/4.9.0.1/phpMyAdmin-4.9.0.1-english.tar.gz
-tar -xvf phpMyAdmin-4.9.0.1-english.tar.gz --strip-components=1 -C /var/www/localhost/phpmyadmin
-mv /tmp/config.inc.php /var/www/localhost/phpmyadmin/config.inc.php
+mkdir /var/www/html/phpmyadmin
+tar xzf phpMyAdmin-4.9.0.1-english.tar.gz --strip-components=1 -C /var/www/html/phpmyadmin
+mv /tmp/config.inc.php /var/www/html/phpmyadmin/config.sample.inc.php
 
+#  ssl certification
 mkdir ~/mkcert && \
   cd ~/mkcert && \
   wget https://github.com/FiloSottile/mkcert/releases/download/v1.1.2/mkcert-v1.1.2-linux-amd64 && \
@@ -55,11 +46,13 @@ mkdir ~/mkcert && \
 ./mkcert -install
 ./mkcert localhost
 
+# droit
 chown -R www-data:www-data /var/www/*
 chmod -R 755 /var/www/*
-# chmod +x ./script.sh
 
-service mysql restart
-/etc/init.d/php7.3-fpm start
+# comeback home
+cd ../..
+
+service php7.3-fpm start
 service nginx restart
 bash
